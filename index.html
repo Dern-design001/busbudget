@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BusBudget - Personal Travel & Food Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Space Grotesk"', 'sans-serif'],
+          },
+          colors: {
+            slate: { 950: '#0b0f19' },
+            brand: { 50:'#f0f9ff', 100:'#e0f2fe', 500:'#0ea5e9', 600:'#0284c7', 700:'#0369a1' }
+          },
+          boxShadow: {
+            'premium':      '0 10px 30px -10px rgba(0,0,0,0.08)',
+            'premium-dark': '0 10px 30px -10px rgba(0,0,0,0.4)',
+            'neon':         '0 0 20px rgba(14,165,233,0.15)',
+            'tab':          '0 -4px 20px rgba(0,0,0,0.06)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .heading-font { font-family: 'Space Grotesk', sans-serif; }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+    .nav-active {
+      background-color: rgba(14,165,233,0.1);
+      border-left: 3px solid #0ea5e9;
+      color: #0ea5e9;
+    }
+
+    /* Bottom tab bar active */
+    .tab-btn-active { color: #0ea5e9; }
+    .tab-btn-active .tab-dot { display: block; }
+
+    /* Modal sheet on mobile slides up */
+    .modal-sheet {
+      transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+    }
+
+    /* Safe area padding for notched phones */
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 12px); }
+    .safe-top    { padding-top:    env(safe-area-inset-top,    0px);  }
+
+    /* Prevent body scroll when modal open */
+    body.modal-open { overflow: hidden; }
+
+    /* Tap highlight removal on mobile */
+    * { -webkit-tap-highlight-color: transparent; }
+
+    /* Input zoom prevention on iOS */
+    input, select, textarea { font-size: 16px !important; }
+
+    /* Smooth scroll */
+    html { scroll-behavior: smooth; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 antialiased overflow-x-hidden">
+
+  <!-- Toast -->
+  <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-[90vw] max-w-sm"></div>
+
+  <!-- Sidebar Backdrop -->
+  <div id="sidebar-backdrop" onclick="closeSidebar()" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-30 hidden opacity-0 transition-opacity duration-300"></div>
+
+  <!-- ═══════════════════════════════════════════
+       SIDEBAR (desktop slide-in / mobile overlay)
+  ════════════════════════════════════════════ -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col safe-top">
+    <div class="h-16 flex items-center px-5 border-b border-slate-100 dark:border-slate-800 justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-gradient-to-tr from-brand-500 to-indigo-600 rounded-xl text-white flex items-center justify-center">
+          <i class="fa-solid fa-bus text-lg"></i>
+        </div>
+        <div>
+          <span class="heading-font text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-indigo-500">BusBudget</span>
+          <p class="text-[9px] text-slate-400 font-semibold tracking-wider uppercase">Travel &amp; Food Edition</p>
+        </div>
+      </div>
+      <button onclick="closeSidebar()" class="text-slate-400 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <i class="fa-solid fa-xmark text-base"></i>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-5 space-y-1">
+      <a href="#" onclick="switchTab('dashboard');return false;" id="nav-dashboard" class="nav-active flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all text-sm font-semibold text-slate-600 dark:text-slate-300">
+        <i class="fa-solid fa-chart-line text-base w-5 text-center"></i><span>Dashboard</span>
+      </a>
+      <a href="#" onclick="switchTab('entries');return false;" id="nav-entries" class="flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300">
+        <i class="fa-solid fa-receipt text-base w-5 text-center"></i><span>Manage Entries</span>
+      </a>
+    </nav>
+    <div class="px-4 pb-6 safe-bottom">
+      <button onclick="toggleTheme()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <i class="fa-solid fa-moon dark:hidden"></i>
+        <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+        <span class="dark:hidden">Switch to Dark Mode</span>
+        <span class="hidden dark:block">Switch to Light Mode</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════
+       MAIN WRAPPER
+  ════════════════════════════════════════════ -->
+  <div id="main-content" class="flex flex-col min-h-screen transition-all duration-300">
+
+    <!-- ── HEADER ── -->
+    <header class="safe-top sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+      <div class="h-14 px-4 flex items-center justify-between max-w-4xl mx-auto w-full">
+        <div class="flex items-center space-x-3 min-w-0">
+          <button onclick="toggleSidebar()" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors flex-shrink-0">
+            <i class="fa-solid fa-bars-staggered text-base"></i>
+          </button>
+          <h1 id="page-title" class="text-base font-bold heading-font text-slate-900 dark:text-white truncate">Financial Dashboard</h1>
+        </div>
+        <div class="flex items-center space-x-2 flex-shrink-0">
+          <!-- Theme toggle — hidden on mobile (moved to sidebar) -->
+          <button onclick="toggleTheme()" class="hidden lg:flex p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all items-center justify-center">
+            <i class="fa-solid fa-moon dark:hidden text-base"></i>
+            <i class="fa-solid fa-sun hidden dark:block text-base text-yellow-400"></i>
+          </button>
+          <button onclick="openModal('addEntryModal')" class="bg-gradient-to-r from-brand-500 to-indigo-500 text-white font-semibold py-2 px-3.5 rounded-xl text-sm shadow-premium flex items-center space-x-1.5 active:scale-95 transition-transform">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Add Log</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── PAGE CONTENT ── -->
+    <div class="flex-1 overflow-y-auto pb-24" id="page-scroll-area">
+      <div class="p-4 max-w-4xl mx-auto w-full space-y-4">
+
+        <!-- ╔═══════════════╗
+             ║  DASHBOARD    ║
+             ╚═══════════════╝ -->
+        <div id="tab-dashboard" class="space-y-4">
+
+          <!-- Stat Cards — 2 col on mobile, 4 col on lg -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-premium">
+              <div class="flex items-center space-x-2 mb-2">
+                <div class="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg">
+                  <i class="fa-solid fa-wallet text-sm"></i>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Allocated</p>
+              </div>
+              <h3 id="stat-budget" class="text-lg font-bold heading-font text-slate-900 dark:text-white">&#8377;0</h3>
+              <p class="text-[10px] text-slate-400 mt-0.5">Daily allowance</p>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-premium">
+              <div class="flex items-center space-x-2 mb-2">
+                <div class="p-2 bg-rose-500/10 text-rose-500 rounded-lg">
+                  <i class="fa-solid fa-arrow-trend-down text-sm"></i>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spent</p>
+              </div>
+              <h3 id="stat-spent" class="text-lg font-bold heading-font text-slate-900 dark:text-white">&#8377;0</h3>
+              <p class="text-[10px] text-slate-400 mt-0.5">Total outgoings</p>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-premium">
+              <div class="flex items-center space-x-2 mb-2">
+                <div class="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                  <i class="fa-solid fa-piggy-bank text-sm"></i>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Saved</p>
+              </div>
+              <h3 id="stat-saved" class="text-lg font-bold heading-font text-slate-900 dark:text-white">&#8377;0</h3>
+              <p class="text-[10px] font-semibold mt-0.5" id="stat-percentage">0% rate</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-brand-500 to-indigo-600 rounded-2xl p-4 text-white shadow-premium col-span-2 lg:col-span-1 relative overflow-hidden">
+              <div class="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+              <div class="flex items-center space-x-2 mb-2 relative z-10">
+                <div class="p-2 bg-white/20 rounded-lg">
+                  <i class="fa-solid fa-vault text-sm"></i>
+                </div>
+                <p class="text-[10px] font-bold text-white/80 uppercase tracking-wider">Net Wallet</p>
+              </div>
+              <h3 id="stat-net" class="text-lg font-bold heading-font relative z-10">&#8377;0</h3>
+              <p class="text-[10px] text-white/70 mt-0.5 relative z-10" id="stat-net-sub">Ready</p>
+            </div>
+          </div>
+
+          <!-- Recent Logs — card-based on mobile instead of table -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 class="font-bold text-slate-900 dark:text-white heading-font text-sm">Latest Daily Accounts</h4>
+                <p class="text-[10px] text-slate-400 mt-0.5">Most recently logged</p>
+              </div>
+              <button onclick="switchTab('entries')" class="text-xs text-brand-500 font-bold flex items-center space-x-1">
+                <span>All</span><i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </button>
+            </div>
+            <!-- Mobile: stacked rows; Desktop: table via hidden/block swap -->
+            <div id="recent-logs-list" class="divide-y divide-slate-100 dark:divide-slate-800"></div>
+          </div>
+        </div>
+
+        <!-- ╔═══════════════╗
+             ║   ENTRIES     ║
+             ╚═══════════════╝ -->
+        <div id="tab-entries" class="space-y-4 hidden">
+
+          <!-- Search + Sort -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 shadow-premium space-y-3">
+            <div class="relative">
+              <input type="text" id="entry-search" oninput="renderEntryList()" placeholder="Search entries..." class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm">
+              <span class="absolute left-3 top-3 text-slate-400"><i class="fa-solid fa-magnifying-glass text-sm"></i></span>
+            </div>
+            <select id="entry-filter-sort" onchange="renderEntryList()" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-brand-500 text-sm text-slate-700 dark:text-slate-200">
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="budget-high">Highest Budget</option>
+              <option value="spent-high">Highest Expense</option>
+              <option value="saved-high">Highest Saving</option>
+            </select>
+          </div>
+
+          <!-- Cards grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="entries-grid"></div>
+
+          <!-- Empty state -->
+          <div id="entries-empty-state" class="hidden text-center py-16 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+            <div class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <i class="fa-solid fa-receipt text-2xl"></i>
+            </div>
+            <h3 class="font-bold heading-font text-slate-800 dark:text-white">No entries yet</h3>
+            <p class="text-xs text-slate-400 mt-1 max-w-xs mx-auto px-4">Start tracking your daily food, bus, auto, and bike spending.</p>
+            <button onclick="openModal('addEntryModal')" class="mt-4 bg-brand-500 text-white py-2.5 px-6 rounded-xl text-sm font-semibold">Add First Log</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── BOTTOM TAB BAR (mobile) ── -->
+    <nav class="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-tab safe-bottom lg:hidden" id="bottom-nav">
+      <div class="flex items-center justify-around h-16 px-2">
+
+        <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn-active flex flex-col items-center justify-center space-y-1 flex-1 py-2 rounded-xl transition-colors active:bg-slate-100 dark:active:bg-slate-800">
+          <i class="fa-solid fa-chart-line text-lg"></i>
+          <span class="text-[10px] font-bold">Dashboard</span>
+          <span class="tab-dot w-1 h-1 rounded-full bg-brand-500 hidden"></span>
+        </button>
+
+        <!-- Center FAB -->
+        <button onclick="openModal('addEntryModal')" class="flex flex-col items-center justify-center -mt-5 flex-shrink-0">
+          <div class="w-14 h-14 bg-gradient-to-br from-brand-500 to-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-brand-500/30 active:scale-95 transition-transform">
+            <i class="fa-solid fa-plus text-white text-xl"></i>
+          </div>
+          <span class="text-[10px] font-bold text-brand-500 mt-1">New Log</span>
+        </button>
+
+        <button onclick="switchTab('entries')" id="tab-btn-entries" class="flex flex-col items-center justify-center space-y-1 flex-1 py-2 rounded-xl text-slate-400 dark:text-slate-500 transition-colors active:bg-slate-100 dark:active:bg-slate-800">
+          <i class="fa-solid fa-receipt text-lg"></i>
+          <span class="text-[10px] font-bold">Entries</span>
+          <span class="tab-dot w-1 h-1 rounded-full bg-brand-500 hidden"></span>
+        </button>
+
+      </div>
+    </nav>
+
+  </div><!-- /main-content -->
+
+  <!-- ═══════════════════════════════════════════
+       ADD / EDIT MODAL  (bottom sheet on mobile)
+  ════════════════════════════════════════════ -->
+  <div id="addEntryModal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+    <!-- Backdrop -->
+    <div onclick="closeModal('addEntryModal')" class="absolute inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm"></div>
+
+    <!-- Sheet -->
+    <div class="modal-sheet absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-900 rounded-t-3xl shadow-2xl border-t border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col safe-bottom
+                lg:relative lg:m-auto lg:rounded-3xl lg:max-w-2xl lg:max-h-[90vh] lg:top-auto lg:bottom-auto lg:my-8 lg:border"
+         id="modal-panel">
+
+      <!-- Drag handle -->
+      <div class="flex justify-center pt-3 pb-1 lg:hidden flex-shrink-0">
+        <div class="w-10 h-1 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
+      </div>
+
+      <!-- Header -->
+      <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
+        <div>
+          <h3 class="text-base font-bold heading-font text-slate-900 dark:text-white" id="modal-title">Track Daily Financial Log</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Food, Bus, Auto &amp; Bike expenses</p>
+        </div>
+        <button onclick="closeModal('addEntryModal')" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Scrollable form body -->
+      <form id="entryForm" onsubmit="saveEntry(event)" class="overflow-y-auto flex-1">
+        <div class="p-5 space-y-4">
+          <input type="hidden" id="entry-id-field">
+
+          <!-- Date + Budget row -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Date</label>
+              <input type="date" id="form-date" required class="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white text-slate-800">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Budget (&#8377;)</label>
+              <input type="number" step="1" min="0" id="form-budget" oninput="calculateSavingsPreview()" placeholder="e.g. 1500" required class="w-full px-3 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white font-semibold text-slate-800">
+            </div>
+          </div>
+
+          <!-- Expenses section -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+              <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100 heading-font">Spending Items</h4>
+              <button type="button" onclick="addExpenseRow()" class="text-xs bg-brand-500 text-white font-bold py-1.5 px-3 rounded-lg flex items-center space-x-1 active:scale-95 transition-transform">
+                <i class="fa-solid fa-plus text-[10px]"></i><span>Add</span>
+              </button>
+            </div>
+            <div id="expense-rows-container" class="divide-y divide-slate-100 dark:divide-slate-700/50"></div>
+            <div id="no-expense-state" class="text-center py-8 px-4">
+              <i class="fa-solid fa-hand-holding-dollar text-slate-300 dark:text-slate-600 text-2xl mb-2"></i>
+              <p class="text-xs text-slate-400">No expenses added. Tap <strong>Add</strong> to log one.</p>
+            </div>
+          </div>
+
+          <!-- Savings preview -->
+          <div class="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Spent</p>
+              <span id="preview-total-spent" class="text-sm font-bold text-slate-700 dark:text-slate-200">&#8377;0.00</span>
+            </div>
+            <div class="text-right">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Projected Savings</p>
+              <p id="preview-projected-savings" class="text-xl font-bold text-emerald-500 heading-font">&#8377;0.00</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky footer buttons -->
+        <div class="px-5 pb-5 pt-2 flex gap-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <button type="button" onclick="closeModal('addEntryModal')" class="flex-1 py-3 text-sm font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl active:scale-95 transition-transform">Cancel</button>
+          <button type="submit" class="flex-2 flex-grow-[2] py-3 bg-gradient-to-r from-brand-500 to-indigo-500 text-white font-bold rounded-xl text-sm shadow-premium active:scale-95 transition-transform">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
