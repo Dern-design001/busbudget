@@ -48,6 +48,168 @@ const fmtShort = v => {
   return `\u20B9${n.toFixed(0)}`;
 };
 
+// ════════════════════════════════════════════════════════════
+// PIN AUTH SYSTEM
+// ════════════════════════════════════════════════════════════
+const PIN_KEY     = 'busbudget_pin';
+const SESSION_KEY = 'busbudget_session';
+let pinBuffer     = '';
+let authMode      = 'login';   // 'login' | 'setup' | 'change-old' | 'change-new' | 'change-confirm'
+let newPinTemp    = '';
+
+function initAuth() {
+  const hasPin    = !!localStorage.getItem(PIN_KEY);
+  const hasSession = sessionStorage.getItem(SESSION_KEY) === 'ok';
+
+  if (hasSession) { unlockApp(); return; }
+
+  if (!hasPin) {
+    // First ever open — ask to set a PIN
+    authMode = 'setup';
+    document.getElementById('auth-heading').textContent    = 'Create your PIN';
+    document.getElementById('auth-subheading').textContent = 'Choose a 4-digit PIN to protect your data';
+    document.getElementById('auth-footer').textContent     = 'This PIN locks your BusBudget app.';
+  } else {
+    authMode = 'login';
+  }
+  updateDots();
+}
+
+function pinInput(digit) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += digit;
+  updateDots();
+  if (pinBuffer.length === 4) setTimeout(processPin, 120);
+}
+
+function pinBackspace() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updateDots();
+  hideError();
+}
+
+function pinClear() {
+  pinBuffer = '';
+  updateDots();
+  hideError();
+}
+
+function updateDots() {
+  document.querySelectorAll('.pin-dot').forEach((dot, i) => {
+    dot.classList.toggle('filled', i < pinBuffer.length);
+  });
+}
+
+function processPin() {
+  if (authMode === 'setup') {
+    // First PIN entry — confirm it
+    newPinTemp = pinBuffer;
+    authMode   = 'setup-confirm';
+    document.getElementById('auth-heading').textContent    = 'Confirm your PIN';
+    document.getElementById('auth-subheading').textContent = 'Enter the same PIN again';
+    pinBuffer = ''; updateDots(); return;
+  }
+
+  if (authMode === 'setup-confirm') {
+    if (pinBuffer === newPinTemp) {
+      localStorage.setItem(PIN_KEY, btoa(pinBuffer));
+      sessionStorage.setItem(SESSION_KEY, 'ok');
+      unlockApp();
+      showToast('PIN set successfully', 'success');
+    } else {
+      wrongPin("PINs don't match. Try again.");
+      authMode   = 'setup';
+      newPinTemp = '';
+      document.getElementById('auth-heading').textContent    = 'Create your PIN';
+      document.getElementById('auth-subheading').textContent = 'Choose a 4-digit PIN to protect your data';
+    }
+    return;
+  }
+
+  if (authMode === 'change-old') {
+    const stored = atob(localStorage.getItem(PIN_KEY) || '');
+    if (pinBuffer === stored) {
+      authMode = 'change-new';
+      document.getElementById('auth-heading').textContent    = 'New PIN';
+      document.getElementById('auth-subheading').textContent = 'Enter your new 4-digit PIN';
+      pinBuffer = ''; updateDots(); hideError(); return;
+    } else { wrongPin('Incorrect current PIN'); return; }
+  }
+
+  if (authMode === 'change-new') {
+    newPinTemp = pinBuffer;
+    authMode   = 'change-confirm';
+    document.getElementById('auth-heading').textContent    = 'Confirm new PIN';
+    document.getElementById('auth-subheading').textContent = 'Re-enter your new PIN';
+    pinBuffer = ''; updateDots(); return;
+  }
+
+  if (authMode === 'change-confirm') {
+    if (pinBuffer === newPinTemp) {
+      localStorage.setItem(PIN_KEY, btoa(pinBuffer));
+      unlockApp();
+      showToast('PIN changed successfully', 'success');
+    } else {
+      wrongPin("PINs don't match. Start over.");
+      authMode   = 'change-new';
+      newPinTemp = '';
+      document.getElementById('auth-heading').textContent    = 'New PIN';
+      document.getElementById('auth-subheading').textContent = 'Enter your new 4-digit PIN';
+    }
+    return;
+  }
+
+  // Default: login
+  const stored = atob(localStorage.getItem(PIN_KEY) || '');
+  if (pinBuffer === stored) {
+    sessionStorage.setItem(SESSION_KEY, 'ok');
+    unlockApp();
+  } else {
+    wrongPin('Incorrect PIN. Try again.');
+  }
+}
+
+function wrongPin(msg) {
+  document.getElementById('auth-error-msg').textContent = msg;
+  document.getElementById('auth-error').classList.remove('hidden');
+  document.getElementById('pin-dots').classList.add('shake');
+  setTimeout(() => document.getElementById('pin-dots').classList.remove('shake'), 500);
+  pinBuffer = ''; updateDots();
+}
+
+function hideError() { document.getElementById('auth-error').classList.add('hidden'); }
+
+function unlockApp() {
+  const gate = document.getElementById('auth-gate');
+  gate.classList.add('fade-out');
+  setTimeout(() => gate.style.display = 'none', 420);
+}
+
+function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  pinBuffer  = '';
+  authMode   = 'login';
+  const gate = document.getElementById('auth-gate');
+  gate.style.display = '';
+  gate.classList.remove('fade-out');
+  document.getElementById('auth-heading').textContent    = 'Welcome back';
+  document.getElementById('auth-subheading').textContent = 'Enter your PIN to continue';
+  updateDots(); hideError(); closeSidebar();
+}
+
+function changePin() {
+  closeSidebar();
+  authMode = 'change-old';
+  pinBuffer = '';
+  const gate = document.getElementById('auth-gate');
+  gate.style.display = '';
+  gate.classList.remove('fade-out');
+  document.getElementById('auth-heading').textContent    = 'Change PIN';
+  document.getElementById('auth-subheading').textContent = 'Enter your current PIN first';
+  document.getElementById('auth-footer').textContent     = '';
+  updateDots(); hideError();
+}
+
 // ── init ─────────────────────────────────────────────────────
 window.onload = function () {
   const saved = localStorage.getItem('busbudget_v2');
@@ -59,6 +221,7 @@ window.onload = function () {
   }
 
   initTheme();
+  initAuth();       // ← PIN gate check
   renderDashboard();
   renderEntryList();
   setTodayDate();

@@ -71,6 +71,27 @@
 
     /* Smooth scroll */
     html { scroll-behavior: smooth; }
+
+    /* PIN key bg utility (Tailwind can't do /8 opacity dynamically) */
+    .bg-white\/8  { background-color: rgba(255,255,255,0.08); }
+    .bg-white\/15 { background-color: rgba(255,255,255,0.15); }
+    .bg-white\/20 { background-color: rgba(255,255,255,0.20); }
+
+    /* PIN dot filled state */
+    .pin-dot.filled { background-color: #0ea5e9; border-color: #0ea5e9; transform: scale(1.2); }
+
+    /* Auth gate fade out */
+    #auth-gate.fade-out { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+
+    /* Shake animation for wrong PIN */
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%      { transform: translateX(-8px); }
+      40%      { transform: translateX(8px); }
+      60%      { transform: translateX(-6px); }
+      80%      { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.4s ease; }
   </style>
 </head>
 
@@ -78,6 +99,71 @@
 
   <!-- Toast -->
   <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-[90vw] max-w-sm"></div>
+
+  <!-- ═══════════════════════════════════════════
+       AUTH GATE — covers entire screen until login
+  ════════════════════════════════════════════ -->
+  <div id="auth-gate" class="fixed inset-0 z-[999] bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 flex items-center justify-center p-5">
+    <!-- Decorative blobs -->
+    <div class="absolute top-0 left-0 w-72 h-72 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-0 right-0 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="relative z-10 w-full max-w-sm">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-tr from-brand-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/30">
+          <i class="fa-solid fa-bus text-white text-2xl"></i>
+        </div>
+        <h1 class="heading-font text-2xl font-bold text-white">BusBudget</h1>
+        <p class="text-slate-400 text-sm mt-1">Personal Travel &amp; Food Tracker</p>
+      </div>
+
+      <!-- Login card -->
+      <div class="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6 shadow-2xl">
+        <h2 class="text-white font-bold heading-font text-base mb-1" id="auth-heading">Welcome back</h2>
+        <p class="text-slate-400 text-xs mb-5" id="auth-subheading">Enter your PIN to continue</p>
+
+        <!-- Error message -->
+        <div id="auth-error" class="hidden mb-4 px-4 py-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs font-semibold flex items-center space-x-2">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <span id="auth-error-msg">Incorrect PIN. Try again.</span>
+        </div>
+
+        <!-- PIN dots display -->
+        <div class="flex justify-center space-x-3 mb-6" id="pin-dots">
+          <span class="pin-dot w-3 h-3 rounded-full border-2 border-slate-500 transition-all duration-200"></span>
+          <span class="pin-dot w-3 h-3 rounded-full border-2 border-slate-500 transition-all duration-200"></span>
+          <span class="pin-dot w-3 h-3 rounded-full border-2 border-slate-500 transition-all duration-200"></span>
+          <span class="pin-dot w-3 h-3 rounded-full border-2 border-slate-500 transition-all duration-200"></span>
+        </div>
+
+        <!-- Number pad -->
+        <div class="grid grid-cols-3 gap-3" id="pin-pad">
+          <button onclick="pinInput('1')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">1</button>
+          <button onclick="pinInput('2')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">2</button>
+          <button onclick="pinInput('3')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">3</button>
+          <button onclick="pinInput('4')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">4</button>
+          <button onclick="pinInput('5')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">5</button>
+          <button onclick="pinInput('6')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">6</button>
+          <button onclick="pinInput('7')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">7</button>
+          <button onclick="pinInput('8')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">8</button>
+          <button onclick="pinInput('9')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">9</button>
+          <button onclick="pinClear()" class="pin-key aspect-square rounded-2xl bg-white/5 active:bg-white/10 active:scale-95 text-slate-400 text-sm font-bold flex items-center justify-center transition-all border border-white/5">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+          <button onclick="pinInput('0')" class="pin-key aspect-square rounded-2xl bg-white/8 hover:bg-white/15 active:bg-white/20 active:scale-95 text-white font-bold text-xl flex items-center justify-center transition-all border border-white/10">0</button>
+          <button onclick="pinBackspace()" class="pin-key aspect-square rounded-2xl bg-white/5 active:bg-white/10 active:scale-95 text-slate-400 text-lg flex items-center justify-center transition-all border border-white/5">
+            <i class="fa-solid fa-delete-left"></i>
+          </button>
+        </div>
+
+        <!-- Change PIN link (shows after login) -->
+        <p class="text-center mt-5 text-xs text-slate-500" id="auth-footer">
+          First time? A PIN will be set on first entry.
+        </p>
+      </div>
+    </div>
+  </div>
 
   <!-- Sidebar Backdrop -->
   <div id="sidebar-backdrop" onclick="closeSidebar()" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-30 hidden opacity-0 transition-opacity duration-300"></div>
@@ -108,12 +194,20 @@
         <i class="fa-solid fa-receipt text-base w-5 text-center"></i><span>Manage Entries</span>
       </a>
     </nav>
-    <div class="px-4 pb-6 safe-bottom">
+    <div class="px-4 pb-6 safe-bottom space-y-2">
       <button onclick="toggleTheme()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
         <i class="fa-solid fa-moon dark:hidden"></i>
         <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
         <span class="dark:hidden">Switch to Dark Mode</span>
         <span class="hidden dark:block">Switch to Light Mode</span>
+      </button>
+      <button onclick="changePin()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <i class="fa-solid fa-key text-amber-500"></i>
+        <span>Change PIN</span>
+      </button>
+      <button onclick="logout()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Lock App</span>
       </button>
     </div>
   </aside>
