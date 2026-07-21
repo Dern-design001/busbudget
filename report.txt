@@ -1,0 +1,567 @@
+================================================================
+  BUSBUDGET — FULL PROJECT REPORT
+  Personal Travel & Food Budget Tracker
+  Generated: July 21, 2026
+================================================================
+
+----------------------------------------------------------------
+1. WHAT IS BUSBUDGET?
+----------------------------------------------------------------
+BusBudget is a personal daily budget tracking web application.
+It lets you log your daily budget, track expenses across 4
+categories (Food, Bus, Auto, Bike), and see how much you saved
+each day. Data is stored permanently in a PostgreSQL database.
+
+Key features:
+  - 4-digit PIN lock to protect your data
+  - Dashboard with total budget, spent, saved, net wallet stats
+  - Add / Edit / Delete daily entries
+  - Multiple expense items per day
+  - Search and sort entries
+  - Dark / Light mode toggle
+  - Mobile-first responsive design
+  - Live savings preview while filling the form
+  - Data stored in PostgreSQL (not just browser memory)
+
+----------------------------------------------------------------
+2. TECH STACK
+----------------------------------------------------------------
+  Frontend : HTML5, Tailwind CSS (CDN), Vanilla JavaScript
+  Backend  : Node.js + Express.js (v5)
+  Database : PostgreSQL 18
+  DB Driver: pg (node-postgres)
+  Other    : dotenv (env vars), cors (cross-origin)
+
+----------------------------------------------------------------
+3. PROJECT FOLDER STRUCTURE
+----------------------------------------------------------------
+BusBudget/
+  index.html          → Main HTML page (skeleton + all UI)
+  server.js           → Express server (backend entry point)
+  db.js               → PostgreSQL connection pool
+  schema.sql          → SQL to create the DB table (run once)
+  package.json        → Node project config + npm scripts
+  .env                → Secret DB credentials (never commit)
+  .gitignore          → Excludes node_modules and .env from git
+  css/
+    style.css         → All custom CSS styles
+  js/
+    config.js         → Categories, fallback data, formatters
+    auth.js           → PIN authentication logic
+    ui.js             → Theme, sidebar, tabs, toast, modal
+    dashboard.js      → Dashboard tab rendering
+    entries.js        → Entries tab, save/edit/delete actions
+    app.js            → App state, startup, API fetch calls
+  routes/
+    entries.js        → REST API routes for entries (CRUD)
+  node_modules/       → Installed npm packages (auto-generated)
+
+----------------------------------------------------------------
+4. FILE-BY-FILE BREAKDOWN
+----------------------------------------------------------------
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  .env
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Stores sensitive database credentials.
+  Contents:
+    DB_HOST     = localhost
+    DB_PORT     = 5432
+    DB_USER     = postgres
+    DB_PASSWORD = (your PostgreSQL password)
+    DB_NAME     = busbudget
+    PORT        = 3000
+  Note    : This file is in .gitignore — never pushed to GitHub.
+            dotenv loads these values into process.env at startup.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  schema.sql
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Defines the PostgreSQL table structure.
+  Run     : Once in pgAdmin Query Tool on the busbudget DB.
+  Table   : entries
+  Columns :
+    id         TEXT         Primary key (e.g. "id-1721234567890")
+    date       DATE         Unique — one entry per day max
+    budget     NUMERIC      Daily budget amount in rupees
+    spent      NUMERIC      Total spent that day
+    saved      NUMERIC      budget - spent
+    expenses   JSONB        Array of expense objects
+                            e.g. [{"name":"Bus","category":"Bus","amount":50}]
+    created_at TIMESTAMPTZ  Auto-set to current timestamp on insert
+  Index   : idx_entries_date on date DESC for fast queries
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  db.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Creates and exports a shared PostgreSQL connection pool.
+  How it works:
+    - Reads DB credentials from process.env (loaded from .env)
+    - Creates a Pool using the pg library
+    - Tests the connection on startup — logs success or failure
+    - Exports the pool so routes/entries.js can query the DB
+  Why pool? : A pool reuses DB connections efficiently instead
+              of opening a new connection per request.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  server.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : The Express HTTP server — handles all requests.
+  What it does:
+    1. Loads .env using dotenv
+    2. Sets up middleware:
+       - cors()         → allows browser to call the API
+       - express.json() → parses JSON request bodies
+    3. Serves static files (index.html, css/, js/) from root
+    4. Mounts API routes: /api/entries → routes/entries.js
+    5. Fallback route serves index.html for any unknown URL
+    6. Listens on PORT 3000
+  Start command: npm start  (or npm run dev for auto-restart)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  routes/entries.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : REST API — all database operations for entries.
+  Base URL: /api/entries
+
+  ROUTE 1 — GET /api/entries
+    Action  : Fetch all entries from DB
+    Query   : SELECT * FROM entries ORDER BY date DESC
+    Returns : JSON array of all entry rows
+    Used by : loadEntries() in js/app.js on page load
+
+  ROUTE 2 — POST /api/entries
+    Action  : Create a new entry
+    Requires: id, date, budget in request body
+    Query   : INSERT INTO entries ... VALUES (...)
+    Returns : The newly created row (201 Created)
+    Error   : 409 if an entry for that date already exists
+    Used by : saveEntry() in js/entries.js
+
+  ROUTE 3 — PUT /api/entries/:id
+    Action  : Update an existing entry by id
+    Query   : UPDATE entries SET ... WHERE id=$6
+    Returns : The updated row
+    Error   : 404 if entry not found
+    Used by : saveEntry() in js/entries.js (when editing)
+
+  ROUTE 4 — DELETE /api/entries/:id
+    Action  : Delete an entry by id
+    Query   : DELETE FROM entries WHERE id=$1
+    Returns : { success: true }
+    Error   : 404 if entry not found
+    Used by : deleteEntry() in js/entries.js
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  css/style.css
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : All custom CSS that Tailwind cannot handle.
+  Contains:
+    - Font family assignments (Plus Jakarta Sans, Space Grotesk)
+    - Custom scrollbar styling
+    - .nav-active  → blue left-border on active sidebar link
+    - .tab-btn-active → blue color on active bottom tab
+    - .modal-sheet → slide-up animation for mobile modal
+    - .safe-top / .safe-bottom → notch-safe padding (iOS)
+    - body.modal-open → disables background scroll
+    - .bg-white/8, /15, /20 → PIN keypad opacity backgrounds
+    - .pin-dot.filled → blue filled PIN dot when digit entered
+    - #auth-gate.fade-out → fade animation when unlocking
+    - @keyframes shake → error shake animation for wrong PIN
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  js/config.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Global constants used across all JS files.
+  Contains:
+    expenseCategories — object with 4 categories:
+      Food  → icon: fa-utensils,   color: amber
+      Bus   → icon: fa-bus,        color: sky blue
+      Auto  → icon: fa-taxi,       color: orange
+      Bike  → icon: fa-motorcycle, color: emerald
+    fallbackDatabase  — 7 sample entries for demo/first load
+    fmt(v)            → formats number as ₹1,234.56
+    fmtShort(v)       → formats number as ₹1.2k (dashboard cards)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  js/auth.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Handles PIN-based app locking.
+  Storage : PIN hash stored in localStorage (base64 encoded)
+            Session stored in sessionStorage (cleared on tab close)
+
+  Functions:
+    initAuth()        → On load: checks if PIN exists.
+                        If no PIN → setup mode.
+                        If PIN exists but no session → login mode.
+                        If session valid → unlockApp() immediately.
+
+    pinInput(digit)   → Adds digit to pinBuffer (max 4).
+                        When 4 digits entered → calls processPin().
+
+    pinBackspace()    → Removes last digit from pinBuffer.
+    pinClear()        → Clears entire pinBuffer.
+    updateDots()      → Fills/empties the 4 dot indicators on screen.
+
+    processPin()      → Core logic. Handles 6 modes:
+      setup           → Captures new PIN, moves to setup-confirm
+      setup-confirm   → Confirms PIN match, saves to localStorage
+      change-old      → Verifies current PIN before allowing change
+      change-new      → Captures new PIN
+      change-confirm  → Confirms new PIN match, saves
+      login (default) → Compares entered PIN to stored hash
+
+    wrongPin(msg)     → Shows error message + shake animation
+    hideError()       → Hides the error message div
+    unlockApp()       → Fades out auth gate div
+    logout()          → Clears session, shows auth gate again
+    changePin()       → Opens auth gate in change-PIN mode
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  js/ui.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : UI interactions — theme, sidebar, tabs, toast, modal.
+
+  Functions:
+    showToast(msg, type) → Shows a floating notification for 2.8s.
+                           type: 'success' (green), 'error' (red),
+                                 'info' (slate/dark)
+
+    initTheme()          → Applies dark/light class to <html> based
+                           on appState.theme
+    toggleTheme()        → Toggles between dark/light, saves pref,
+                           shows toast
+
+    toggleSidebar()      → Opens or closes sidebar
+    openSidebar()        → Slides sidebar in from left, shows backdrop
+    closeSidebar()       → Slides sidebar out, hides backdrop
+
+    switchTab(tab)       → Switches between 'dashboard' and 'entries'
+                           tabs. Updates nav highlights, bottom tab
+                           bar, page title, and triggers render.
+
+    openModal(id)        → Shows modal overlay.
+                           For addEntryModal: resets the form,
+                           sets today's date, clears expense rows.
+                           On desktop: centres the panel.
+    closeModal(id)       → Hides modal, restores body scroll.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  js/dashboard.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Renders the Dashboard tab.
+
+  Functions:
+    renderDashboard() → Reads appState.entries and:
+      1. Sums total budget, spent, saved across all entries
+      2. Calculates savings rate % (saved/budget * 100)
+      3. Updates 4 stat cards:
+           stat-budget    → total allocated budget
+           stat-spent     → total spent
+           stat-saved     → total saved
+           stat-net       → budget - spent (net wallet)
+           stat-percentage → savings rate with color coding:
+                             >=50% green, >=20% amber, <20% red
+           stat-net-sub   → "Positive ✓" or "Deficit ⚠"
+      4. Renders recent-logs-list (top 5 most recent entries)
+         Each row shows: date, category icons, spent, % saved
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  js/entries.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : Entries tab rendering + all CRUD operations.
+
+  Functions:
+    renderEntryList()     → Reads appState.entries, applies search
+                            filter and sort, renders entry cards.
+                            Each card shows: date, budget/spent/saved
+                            stats, expense line items, efficiency badge.
+                            Sort options: date desc/asc, budget high,
+                            spent high, saved high.
+                            Shows empty state if no results.
+
+    addExpenseRow(data)   → Dynamically adds an expense input row
+                            inside the Add/Edit modal form.
+                            Each row has: category dropdown,
+                            description text input, amount number input.
+                            data = null for new row, or existing
+                            expense object when editing.
+
+    removeExpenseRow(id)  → Removes a specific expense row from the
+                            form. Shows "no expense" state if empty.
+
+    calculateSavingsPreview() → Live calculation in the modal.
+                            Reads budget and all expense amounts,
+                            shows total spent and projected savings.
+                            Savings turns red + pulses if negative.
+
+    saveEntry(e)          → async. Handles form submit.
+                            Collects date, budget, all expense rows.
+                            Validates no zero-amount expenses.
+                            Builds record object.
+                            If editing (id exists): PUT /api/entries/:id
+                            If new: POST /api/entries
+                            On success: closes modal, calls loadEntries()
+                            to refresh from DB.
+
+    editEntry(id)         → Opens modal pre-filled with existing entry
+                            data. Sets hidden entry-id-field so
+                            saveEntry knows to PUT not POST.
+
+    deleteEntry(id)       → Shows inline confirm overlay with date.
+                            On confirm: DELETE /api/entries/:id
+                            On success: calls loadEntries() to refresh.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  js/app.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : App state, startup sequence, API communication.
+
+  Constants:
+    API = '/api/entries'  → Base URL for all fetch() calls
+
+  State:
+    appState = {
+      theme:       'light' or 'dark'
+      activeTab:   'dashboard' or 'entries'
+      sidebarOpen: true or false
+      entries:     [ array of entry objects from DB ]
+    }
+
+  Functions:
+    savePrefs()       → Saves only theme and activeTab to
+                        localStorage (not entries — those are in DB)
+
+    setTodayDate()    → Sets the date input in the modal to today
+
+    loadEntries()     → async. Calls GET /api/entries.
+                        Maps response through normalizeEntry().
+                        Updates appState.entries.
+                        Calls renderDashboard() and renderEntryList().
+                        Shows error toast if server unreachable.
+
+    normalizeEntry(row) → Converts raw DB row to clean JS object.
+                        Strips time from date string.
+                        Parses numeric strings to floats.
+                        Ensures expenses is always an array.
+
+    window.onload     → App startup:
+                        1. Restore theme/tab from localStorage
+                        2. initTheme()
+                        3. initAuth() (show PIN gate)
+                        4. setTodayDate()
+                        5. await loadEntries() (fetch from DB)
+                        6. Add resize listener for sidebar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  index.html
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Purpose : The single HTML page — all UI structure.
+  Sections:
+    <head>      → Fonts (Google), Icons (Font Awesome), Tailwind CDN,
+                  Tailwind config (dark mode, custom colors/shadows),
+                  Link to css/style.css
+    Auth Gate   → Full-screen PIN lock overlay (#auth-gate)
+                  Contains PIN dots, numpad, error message
+    Sidebar     → Slide-in navigation panel with logo, nav links,
+                  theme toggle, change PIN, lock app buttons
+    Header      → Sticky top bar with hamburger, page title,
+                  theme toggle (desktop), Add Log button
+    Dashboard   → Stat cards (allocated/spent/saved/net),
+                  Recent logs list
+    Entries     → Search input, sort dropdown, entries grid,
+                  empty state
+    Bottom Nav  → Mobile-only fixed bottom bar with tabs + FAB
+    Modal       → Add/Edit entry modal with date, budget,
+                  expense rows, savings preview, submit button
+    Scripts     → Loads all JS files in order:
+                  config.js → auth.js → ui.js →
+                  dashboard.js → entries.js → app.js
+
+----------------------------------------------------------------
+5. HOW EVERYTHING CONNECTS (DATA FLOW)
+----------------------------------------------------------------
+
+  USER OPENS APP
+      │
+      ▼
+  Browser loads index.html from Express static server
+      │
+      ▼
+  JS files load in order: config → auth → ui → dashboard
+                          → entries → app
+      │
+      ▼
+  window.onload fires (app.js)
+      ├── initTheme()    → applies dark/light
+      ├── initAuth()     → shows PIN gate
+      ├── setTodayDate() → sets form date
+      └── loadEntries()  → GET /api/entries
+                               │
+                         Express server receives request
+                               │
+                         routes/entries.js queries PostgreSQL
+                               │
+                         SELECT * FROM entries ORDER BY date DESC
+                               │
+                         Returns JSON array to browser
+                               │
+                         appState.entries = normalized data
+                               │
+                         renderDashboard() + renderEntryList()
+
+  USER ADDS AN ENTRY
+      │
+      ▼
+  Clicks "Add Log" → openModal() → form shown
+      │
+      ▼
+  Fills date, budget, adds expense rows
+  calculateSavingsPreview() fires on every input
+      │
+      ▼
+  Clicks "Save Entry" → saveEntry(e)
+      │
+      ▼
+  POST /api/entries  →  routes/entries.js
+      │
+      ▼
+  INSERT INTO entries ... VALUES (...)
+      │
+      ▼
+  DB confirms → loadEntries() called → UI refreshed
+
+  USER EDITS AN ENTRY
+      │
+      ▼
+  Clicks edit icon → editEntry(id)
+      │
+      ▼
+  Modal opens pre-filled → saveEntry()
+      │
+      ▼
+  PUT /api/entries/:id → UPDATE entries SET ... WHERE id=...
+      │
+      ▼
+  DB confirms → loadEntries() → UI refreshed
+
+  USER DELETES AN ENTRY
+      │
+      ▼
+  Clicks trash icon → deleteEntry(id)
+      │
+      ▼
+  Confirm dialog shown
+      │
+      ▼
+  Clicks "Delete" → DELETE /api/entries/:id
+      │
+      ▼
+  DB row removed → loadEntries() → UI refreshed
+
+----------------------------------------------------------------
+6. DATABASE TABLE DETAILS
+----------------------------------------------------------------
+
+  Table name : entries
+  Database   : busbudget
+  PostgreSQL : version 18
+
+  Column       Type         Notes
+  -----------  -----------  ----------------------------------
+  id           TEXT         Primary key. Format: "id-<timestamp>"
+  date         DATE         Unique per day. Format: YYYY-MM-DD
+  budget       NUMERIC      Daily budget in INR (rupees)
+  spent        NUMERIC      Sum of all expense amounts
+  saved        NUMERIC      budget - spent (can be negative)
+  expenses     JSONB        Array of expense objects:
+                            [
+                              {
+                                "name": "Bus to office",
+                                "category": "Bus",
+                                "amount": 50
+                              },
+                              ...
+                            ]
+  created_at   TIMESTAMPTZ  Auto timestamp when row created
+
+  Index: idx_entries_date ON entries(date DESC)
+  Reason: Speeds up ORDER BY date DESC queries significantly.
+
+----------------------------------------------------------------
+7. LOCALSTORAGE USAGE (STILL USED FOR SOME THINGS)
+----------------------------------------------------------------
+
+  Key                 Purpose
+  ------------------  ----------------------------------------
+  busbudget_pin       Stores base64-encoded PIN for app lock
+  busbudget_session   'ok' while user is logged in this tab
+  busbudget_prefs     Stores { theme, activeTab } preferences
+
+  NOTE: Entry data is NO LONGER stored in localStorage.
+        It is stored in PostgreSQL only.
+
+----------------------------------------------------------------
+8. API ENDPOINTS SUMMARY
+----------------------------------------------------------------
+
+  Method   URL                    Action
+  -------  ---------------------  ----------------------------
+  GET      /api/entries           Get all entries (newest first)
+  POST     /api/entries           Create new entry
+  PUT      /api/entries/:id       Update entry by id
+  DELETE   /api/entries/:id       Delete entry by id
+
+  All endpoints:
+    - Accept/return JSON
+    - Return appropriate HTTP status codes
+      (200, 201, 400, 404, 409, 500)
+    - Use parameterized queries (safe from SQL injection)
+
+----------------------------------------------------------------
+9. NPM PACKAGES USED
+----------------------------------------------------------------
+
+  Package    Version   Purpose
+  ---------  --------  ----------------------------------------
+  express    ^5.2.1    HTTP server and routing
+  pg         ^8.22.0   PostgreSQL client for Node.js
+  cors       ^2.8.6    Allows browser to call API from any origin
+  dotenv     ^17.4.2   Loads .env file into process.env
+
+----------------------------------------------------------------
+10. HOW TO RUN THE PROJECT
+----------------------------------------------------------------
+
+  Prerequisites:
+    - Node.js installed (v18+)
+    - PostgreSQL installed and running
+    - busbudget database created
+    - entries table created (run schema.sql)
+
+  Steps:
+    1. Fill in DB credentials in .env
+    2. Open terminal in project folder
+    3. Run: npm install      (first time only)
+    4. Run: npm start
+    5. Open: http://localhost:3000
+
+  Dev mode (auto-restart on file save):
+    npm run dev
+
+----------------------------------------------------------------
+11. SECURITY NOTES
+----------------------------------------------------------------
+
+  - .env is in .gitignore — credentials never go to GitHub
+  - All DB queries use parameterized values ($1, $2...) 
+    preventing SQL injection
+  - PIN is stored as base64 (obfuscated, not plain text)
+    Note: base64 is NOT encryption — for stronger security,
+    consider bcrypt hashing for the PIN in the future
+  - CORS is enabled broadly — for production, restrict to
+    your actual domain
+
+================================================================
+  END OF REPORT
+================================================================

@@ -1,0 +1,74 @@
+/* ============================================================
+   BusBudget — style.css
+   All custom styles (Tailwind handles utilities)
+   ============================================================ */
+
+body { font-family: 'Plus Jakarta Sans', sans-serif; }
+.heading-font { font-family: 'Space Grotesk', sans-serif; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+/* ── Sidebar active nav item ── */
+.nav-active {
+  background-color: rgba(14,165,233,0.1);
+  border-left: 3px solid #0ea5e9;
+  color: #0ea5e9;
+}
+
+/* ── Bottom tab bar active state ── */
+.tab-btn-active { color: #0ea5e9; }
+.tab-btn-active .tab-dot { display: block; }
+
+/* ── Modal bottom sheet slide animation ── */
+.modal-sheet {
+  transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+}
+
+/* ── Safe area padding for notched phones ── */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 12px); }
+.safe-top    { padding-top:    env(safe-area-inset-top,    0px);  }
+
+/* ── Prevent body scroll when modal is open ── */
+body.modal-open { overflow: hidden; }
+
+/* ── Remove tap highlight on mobile ── */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ── Prevent input zoom on iOS ── */
+input, select, textarea { font-size: 16px !important; }
+
+/* ── Smooth scroll ── */
+html { scroll-behavior: smooth; }
+
+/* ── PIN key opacity utilities (Tailwind can't do /8 dynamically) ── */
+.bg-white\/8  { background-color: rgba(255,255,255,0.08); }
+.bg-white\/15 { background-color: rgba(255,255,255,0.15); }
+.bg-white\/20 { background-color: rgba(255,255,255,0.20); }
+
+/* ── PIN dot filled state ── */
+.pin-dot.filled {
+  background-color: #0ea5e9;
+  border-color: #0ea5e9;
+  transform: scale(1.2);
+}
+
+/* ── Auth gate fade-out on unlock ── */
+#auth-gate.fade-out {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+/* ── Shake animation for wrong PIN ── */
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-6px); }
+  80%      { transform: translateX(6px); }
+}
+.shake { animation: shake 0.4s ease; }
