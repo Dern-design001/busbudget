@@ -1,34 +1,33 @@
 // ============================================================
 // server.js — Express server with Google OAuth
+// Data is stored in the browser (localStorage) — no DB needed
 // ============================================================
 require('dotenv').config();
-const express        = require('express');
-const cors           = require('cors');
-const path           = require('path');
-const session        = require('express-session');
-const pgSession      = require('connect-pg-simple')(session);
-const passport       = require('./auth/passport');
-const authRouter     = require('./auth/routes');
-const entriesRouter  = require('./routes/entries');
-const pool           = require('./db');
+const express    = require('express');
+const cors       = require('cors');
+const path       = require('path');
+const session    = require('express-session');
+const passport   = require('./auth/passport');
+const authRouter = require('./auth/routes');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Middleware ────────────────────────────────────────────
-app.use(cors({ origin: `http://localhost:${PORT}`, credentials: true }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// ── Session (stored in PostgreSQL) ───────────────────────
+// ── Session (in-memory — no database required) ───────────
 app.use(session({
-  store:             new pgSession({ pool, tableName: 'session' }),
-  secret:            process.env.SESSION_SECRET,
+  secret:            process.env.SESSION_SECRET || 'busbudget_secret',
   resave:            false,
   saveUninitialized: false,
   cookie: {
     maxAge:   7 * 24 * 60 * 60 * 1000,  // 7 days
     httpOnly: true,
     sameSite: 'lax',
+    // On Render (HTTPS) cookies must be secure
+    secure:   process.env.NODE_ENV === 'production',
   }
 }));
 
@@ -40,8 +39,7 @@ app.use(passport.session());
 app.use(express.static(path.join(__dirname)));
 
 // ── Routes ────────────────────────────────────────────────
-app.use('/auth',         authRouter);
-app.use('/api/entries',  entriesRouter);
+app.use('/auth', authRouter);
 
 // ── Fallback ──────────────────────────────────────────────
 app.get('/{*path}', (req, res) => {

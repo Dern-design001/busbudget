@@ -1,8 +1,8 @@
 // ============================================================
-// app.js — App state, bootstrap, API communication
+// app.js — App state, bootstrap, localStorage persistence
 // ============================================================
 
-const API = '/api/entries';
+const STORAGE_KEY = 'busbudget_entries';
 
 let appState = {
   theme:       'light',
@@ -11,7 +11,21 @@ let appState = {
   entries:     []
 };
 
-// ── Persist theme/UI prefs to localStorage (not entries) ──
+// ── localStorage helpers ──────────────────────────────────
+function loadEntriesFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveEntriesToStorage(entries) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+// ── Persist theme/UI prefs ────────────────────────────────
 function savePrefs() {
   localStorage.setItem('busbudget_prefs', JSON.stringify({
     theme:     appState.theme,
@@ -28,30 +42,24 @@ function setTodayDate() {
   document.getElementById('form-date').value = `${y}-${m}-${day}`;
 }
 
-// ── Load all entries from the server ─────────────────────
-async function loadEntries() {
-  try {
-    const res  = await fetch(API);
-    const data = await res.json();
-    // Normalize: expenses comes back as a parsed array from JSONB
-    appState.entries = data.map(normalizeEntry);
-    renderDashboard();
-    renderEntryList();
-  } catch (err) {
-    console.error('Failed to load entries:', err);
-    showToast('Could not reach server', 'error');
-  }
+// ── Load entries (from localStorage) ─────────────────────
+function loadEntries() {
+  appState.entries = loadEntriesFromStorage().map(normalizeEntry);
+  renderDashboard();
+  renderEntryList();
 }
 
-// ── Normalize a DB row to match the frontend shape ────────
+// ── Normalize an entry to the expected shape ──────────────
 function normalizeEntry(row) {
   return {
     id:       row.id,
-    date:     row.date.substring(0, 10),   // strip timestamp
-    budget:   parseFloat(row.budget),
-    spent:    parseFloat(row.spent),
-    saved:    parseFloat(row.saved),
-    expenses: Array.isArray(row.expenses) ? row.expenses : JSON.parse(row.expenses || '[]')
+    date:     (row.date || '').substring(0, 10),
+    budget:   parseFloat(row.budget)  || 0,
+    spent:    parseFloat(row.spent)   || 0,
+    saved:    parseFloat(row.saved)   || 0,
+    expenses: Array.isArray(row.expenses)
+                ? row.expenses
+                : JSON.parse(row.expenses || '[]')
   };
 }
 
@@ -61,16 +69,16 @@ window.onload = async function () {
   const prefs = localStorage.getItem('busbudget_prefs');
   if (prefs) {
     try {
-      const p = JSON.parse(prefs);
+      const p        = JSON.parse(prefs);
       appState.theme     = p.theme     || 'light';
       appState.activeTab = p.activeTab || 'dashboard';
     } catch (e) {}
   }
 
   initTheme();
-  initAuth();
+  await initAuth();   // checks Google login via /auth/me
   setTodayDate();
-  await loadEntries();
+  loadEntries();
 
   window.addEventListener('resize', () => {
     if (window.innerWidth < 1024 && appState.sidebarOpen) closeSidebar();

@@ -1,5 +1,6 @@
 // ============================================================
 // entries.js — Entry list, expense rows, save / edit / delete
+// Data persisted to localStorage (no server DB)
 // ============================================================
 
 // ── Render the Entries tab grid ───────────────────────────
@@ -184,7 +185,7 @@ function calculateSavingsPreview() {
 }
 
 // ── Save (create or update) an entry ─────────────────────
-async function saveEntry(e) {
+function saveEntry(e) {
   e.preventDefault();
   const id     = document.getElementById('entry-id-field').value;
   const date   = document.getElementById('form-date').value;
@@ -205,41 +206,35 @@ async function saveEntry(e) {
   if (hasZero) { showToast('Each expense amount must be greater than 0', 'error'); return; }
 
   const record = {
-    id: id || ('id-' + Date.now()),
-    date, budget,
+    id:       id || ('id-' + Date.now()),
+    date,
+    budget,
     expenses: expItems,
     spent,
-    saved: budget - spent
+    saved:    budget - spent,
   };
 
-  try {
-    let res;
-    if (id) {
-      // Update existing entry
-      res = await fetch(`${API}/${id}`, {
-        method:  'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(record)
-      });
-    } else {
-      // Create new entry
-      res = await fetch(API, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(record)
-      });
+  // Read current stored entries
+  let entries = loadEntriesFromStorage();
+
+  if (id) {
+    // Update existing
+    const idx = entries.findIndex(x => x.id === id);
+    if (idx !== -1) entries[idx] = record;
+    else entries.push(record);
+  } else {
+    // Check for duplicate date
+    if (entries.some(x => x.date === date)) {
+      showToast(`An entry for ${date} already exists`, 'error');
+      return;
     }
-
-    const data = await res.json();
-    if (!res.ok) { showToast(data.error || 'Save failed', 'error'); return; }
-
-    showToast(id ? 'Entry updated' : 'Entry saved', 'success');
-    closeModal('addEntryModal');
-    await loadEntries();  // re-fetch fresh data from DB
-  } catch (err) {
-    console.error('saveEntry error:', err);
-    showToast('Server error. Try again.', 'error');
+    entries.push(record);
   }
+
+  saveEntriesToStorage(entries);
+  showToast(id ? 'Entry updated' : 'Entry saved', 'success');
+  closeModal('addEntryModal');
+  loadEntries();
 }
 
 // ── Load an entry into the modal for editing ──────────────
@@ -288,16 +283,12 @@ function deleteEntry(id) {
 
   document.body.appendChild(overlay);
   overlay.querySelector('#del-cancel').onclick  = () => overlay.remove();
-  overlay.querySelector('#del-confirm').onclick = async () => {
-    try {
-      const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
-      if (!res.ok) { showToast('Delete failed', 'error'); return; }
-      showToast('Entry deleted', 'error');
-      overlay.remove();
-      await loadEntries();
-    } catch (err) {
-      console.error('deleteEntry error:', err);
-      showToast('Server error. Try again.', 'error');
-    }
+  overlay.querySelector('#del-confirm').onclick = () => {
+    let entries = loadEntriesFromStorage();
+    entries = entries.filter(x => x.id !== id);
+    saveEntriesToStorage(entries);
+    showToast('Entry deleted', 'error');
+    overlay.remove();
+    loadEntries();
   };
 }
